@@ -13,7 +13,7 @@ Bilibili夏日绘板自动绘制工具
 
 **common.py: 一些公共函数**
 
-** bili.ACT: 适用于Photoshop的夏日绘板调色板文件 **
+**bili.ACT: 适用于Photoshop的夏日绘板调色板文件**
 
 ### 特点
 * 精确计时：自动计算并抵消绘制延迟，最大化绘制效率
