@@ -60,7 +60,6 @@ del nColorTable
 reversedColorTable = {}
 for k, v in colorTable.items():
     reversedColorTable[v] = k
-
 def _loadCanvasWrapper():
     return requests.get("https://api.live.bilibili.com/activity/v1/SummerDraw/bitmap", headers = commonHeaders)
     
@@ -173,3 +172,47 @@ def imgToData(img):
     for i, x in enumerate(img):
         data[i] = ord(reversedColorTable[tuple(x)])
     return data.tobytes().decode("utf-8")
+    
+def selectPix(canvas, img, mask, pos):
+    assert mask.ndim == 2
+    assert mask.shape == img.shape[:2]
+    py, px = pos
+    h, w = img.shape[:2]
+    rect = canvas[py:py + h, px:px + w]
+    idx = np.zeros((h, w, 2), dtype = np.int)
+    for y in range(h):
+        for x in range(w):
+            idx[y, x] = (y, x)
+    diff = idx[np.logical_and(np.any(rect != img, axis = 2), mask)]
+    
+    if(len(diff) == 0):
+        return (0, 0), "A"
+    
+    """# cut block
+    blockSize = 16
+    nBlock = int(np.ceil(h / blockSize)) * int(np.ceil(w / blockSize))
+    blockList = [[] for i in range(nBlock)]
+    for y, x in diff:
+        iBlock = int(y / blockSize) * int(x / blockSize)
+        blockList[iBlock].append((y, x))
+    nBlockList = [x for x in blockList if len(x) > (blockSize * blockSize // 16)]
+    if(len(nBlockList) == 0):
+        blockList = [x for x in blockList if len(x) > 0]
+    else:
+        blockList = nBlockList
+    del nBlockList
+    
+    # select from block
+    if(len(blockList) > 1):
+        iSelectedBlock = np.random.randint(0, min(len(blockList), 2))
+    else:
+        iSelectedBlock = 0
+    iSelected = np.random.randint(len(blockList[iSelectedBlock]))
+    selected = blockList[iSelectedBlock][iSelected]"""
+    
+    iSelected = np.random.randint(len(diff))
+    selected = diff[iSelected]
+    
+    upRatio = diff.shape[0] / (img.shape[0] * img.shape[1])
+    print("Unpainted %d of %d(%d unmasked)(%f%%)" % (diff.shape[0], img.shape[0] * img.shape[1], np.sum(mask), upRatio * 100))
+    return (selected[0] + py, selected[1] + px), reversedColorTable[tuple(img[selected[0], selected[1]])]

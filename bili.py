@@ -3,11 +3,12 @@ import numpy as np
 import cv2
 from common import *
 
-writePos = (108, 960)
+writePos = (80, 1028)
 
-img = cv2.imread("aria_cut.png")
-mask = cv2.imread("aria_mask.png")
+img = cv2.imread("aria_q.png")
+mask = cv2.imread("aria_qmask.png")
 mask = (~mask.transpose(2, 0, 1)[0]).astype(np.bool)
+#mask = ~np.zeros(img.shape[:2], dtype = np.bool)
 imgData = imgToData(img)
 
 # load cookie and delete cookies that in blacklist
@@ -36,50 +37,6 @@ if(len(cookieList) == 0):
     raise ValueError("No account available.")
 cookieLock = threading.Lock()
 print("********** Loaded %d cookie **********" % len(cookieList))
-
-def selectPix(canvas, img, mask, pos):
-    assert mask.ndim == 2
-    assert mask.shape == img.shape[:2]
-    py, px = pos
-    h, w = img.shape[:2]
-    rect = canvas[py:py + h, px:px + w]
-    idx = np.zeros((h, w, 2), dtype = np.int)
-    for y in range(h):
-        for x in range(w):
-            idx[y, x] = (y, x)
-    diff = idx[np.logical_and(np.all(rect != img, axis = 2), mask)]
-    
-    if(len(diff) == 0):
-        return 0, 0, A
-    
-    """# cut block
-    blockSize = 16
-    nBlock = int(np.ceil(h / blockSize)) * int(np.ceil(w / blockSize))
-    blockList = [[] for i in range(nBlock)]
-    for y, x in diff:
-        iBlock = int(y / blockSize) * int(x / blockSize)
-        blockList[iBlock].append((y, x))
-    nBlockList = [x for x in blockList if len(x) > (blockSize * blockSize // 16)]
-    if(len(nBlockList) == 0):
-        blockList = [x for x in blockList if len(x) > 0]
-    else:
-        blockList = nBlockList
-    del nBlockList
-    
-    # select from block
-    if(len(blockList) > 1):
-        iSelectedBlock = np.random.randint(0, min(len(blockList), 2))
-    else:
-        iSelectedBlock = 0
-    iSelected = np.random.randint(len(blockList[iSelectedBlock]))
-    selected = blockList[iSelectedBlock][iSelected]"""
-    
-    iSelected = np.random.randint(len(diff))
-    selected = diff[iSelected]
-    
-    upRatio = diff.shape[0] / (img.shape[0] * img.shape[1])
-    print("Unpainted %d of %d(%d unmasked)(%f%%)" % (diff.shape[0], img.shape[0] * img.shape[1], np.sum(mask), upRatio * 100))
-    return (selected[0] + py, selected[1] + px), reversedColorTable[tuple(img[selected[0], selected[1]])]
 
 def placeIntoBlackList(cookieName):
     with cookieLock:
