@@ -153,7 +153,7 @@ async def drawPix(x, y, data, cookies, cookieName):
 
 def loadCookie(path):
     d = {}
-    with open(path, "rb") as f:
+    with open(path, encoding='utf-8') as f:
         l = json.load(f)
         for x in l:
             d[x["name"]] = x["value"]
