@@ -3,8 +3,8 @@ import numpy as np
 import cv2
 from common import *
 
-img = cv2.imread("aria_q.png")
-y, x = 80, 1027
+img = cv2.imread("th.png")
+y, x = 544, 936
 h, w = img.shape[:2]
 loop = asyncio.get_event_loop()
 canvas = dataToImg(loop.run_until_complete(loadCanvas()), canvasShape)

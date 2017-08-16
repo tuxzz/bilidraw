@@ -61,7 +61,7 @@ reversedColorTable = {}
 for k, v in colorTable.items():
     reversedColorTable[v] = k
 def _loadCanvasWrapper():
-    return requests.get("https://api.live.bilibili.com/activity/v1/SummerDraw/bitmap", headers = commonHeaders)
+    return requests.get("https://api.live.bilibili.com/activity/v1/SummerDraw/bitmap", headers = commonHeaders, timeout = 10)
     
 async def loadCanvas():
     loop = asyncio.get_event_loop()
@@ -85,7 +85,7 @@ async def loadCanvas():
     return d["data"]["bitmap"]
 
 def _getTimeRemainWrapper(cookies):
-    return requests.get("http://api.live.bilibili.com/activity/v1/SummerDraw/status", headers = commonHeaders, cookies = cookies)
+    return requests.get("http://api.live.bilibili.com/activity/v1/SummerDraw/status", headers = commonHeaders, cookies = cookies, timeout = 10)
 
 async def getTimeRemain(cookies, cookieName):
     loop = asyncio.get_event_loop()
@@ -111,7 +111,7 @@ async def getTimeRemain(cookies, cookieName):
     return d["data"]["time"]
 
 def _drawPixWrapper(payload, cookies):
-    return requests.post("https://api.live.bilibili.com/activity/v1/SummerDraw/draw", headers = commonHeaders, data = payload, cookies = cookies)
+    return requests.post("https://api.live.bilibili.com/activity/v1/SummerDraw/draw", headers = commonHeaders, data = payload, cookies = cookies, timeout = 10)
 
 async def drawPix(x, y, data, cookies, cookieName):
     loop = asyncio.get_event_loop()
@@ -172,8 +172,9 @@ def imgToData(img):
     for i, x in enumerate(img):
         data[i] = ord(reversedColorTable[tuple(x)])
     return data.tobytes().decode("utf-8")
-    
-def selectPix(canvas, img, mask, pos):
+
+def genDiffCache(canvas, img, mask, pos):
+    cache = []
     assert mask.ndim == 2
     assert mask.shape == img.shape[:2]
     py, px = pos
@@ -184,35 +185,27 @@ def selectPix(canvas, img, mask, pos):
         for x in range(w):
             idx[y, x] = (y, x)
     diff = idx[np.logical_and(np.any(rect != img, axis = 2), mask)]
-    
-    if(len(diff) == 0):
-        return (0, 0), "A"
-    
-    """# cut block
-    blockSize = 16
-    nBlock = int(np.ceil(h / blockSize)) * int(np.ceil(w / blockSize))
-    blockList = [[] for i in range(nBlock)]
     for y, x in diff:
-        iBlock = int(y / blockSize) * int(x / blockSize)
-        blockList[iBlock].append((y, x))
-    nBlockList = [x for x in blockList if len(x) > (blockSize * blockSize // 16)]
-    if(len(nBlockList) == 0):
-        blockList = [x for x in blockList if len(x) > 0]
-    else:
-        blockList = nBlockList
-    del nBlockList
+        item = (y + py, x + px), reversedColorTable[tuple(img[y, x])]
+        cache.append(item)
     
-    # select from block
-    if(len(blockList) > 1):
-        iSelectedBlock = np.random.randint(0, min(len(blockList), 2))
-    else:
-        iSelectedBlock = 0
-    iSelected = np.random.randint(len(blockList[iSelectedBlock]))
-    selected = blockList[iSelectedBlock][iSelected]"""
-    
-    iSelected = np.random.randint(len(diff))
-    selected = diff[iSelected]
-    
-    upRatio = diff.shape[0] / (img.shape[0] * img.shape[1])
-    print("Unpainted %d of %d(%d unmasked)(%f%%)" % (diff.shape[0], img.shape[0] * img.shape[1], np.sum(mask), upRatio * 100))
-    return (selected[0] + py, selected[1] + px), reversedColorTable[tuple(img[selected[0], selected[1]])]
+    return cache
+
+def selectPixFromCache(cache):
+    if(len(cache) == 0):
+        return None
+    iSelected = np.random.randint(len(cache))
+    selected = cache[iSelected]
+    del cache[iSelected]
+    return selected, cache
+
+def loadJsonImage(path):
+    bitmap = json.load(open(path, "rb"))["bitmap"]
+    img = np.zeros((*canvasShape, 3), dtype = np.uint8).reshape(canvasShape[0] * canvasShape[1], 3)
+    mask = np.zeros(canvasShape, dtype = np.bool).reshape(canvasShape[0] * canvasShape[1])
+    for i, x in enumerate(bitmap):
+        if(x == "Z"):
+            continue
+        img[i] = colorTable[x]
+        mask[i] = True
+    return img.reshape((*canvasShape, 3)), mask.reshape(canvasShape)
