@@ -61,7 +61,7 @@ async def procressAccount(cookies, cookieName):
     if(timeRemain == "BLACKLIST"):
         placeIntoBlackList(cookieName)
         return
-    latency = 1.0
+    latency = 0.0
     forceSleep = False
     while(True):
         try:
