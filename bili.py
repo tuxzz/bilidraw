@@ -11,6 +11,11 @@ mask = (~mask.transpose(2, 0, 1)[0]).astype(np.bool)
 #mask = ~np.zeros(img.shape[:2], dtype = np.bool)
 imgData = imgToData(img)
 
+globalCanvas = np.zeros((*canvasShape, 3), dtype = np.uint8)
+globalDiffCache = []
+globalCanvasLocker = threading.Lock()
+
+
 # load cookie and delete cookies that in blacklist
 oCookiePathList = os.listdir("./accounts")
 cookiePathList = []
@@ -57,8 +62,12 @@ async def procressAccount(cookies, cookieName):
         placeIntoBlackList(cookieName)
         return
     latency = 1.0
+    forceSleep = False
     while(True):
         try:
+            if(forceSleep):
+                await asyncio.sleep(120)
+                forceSleep = False
             timeRemain = max(0.0, timeRemain - latency)
             if(timeRemain > 0.0):
                 print("%s: Time remain: %lfs(Without latency %lfs)" % (cookieName, timeRemain, latency))
@@ -66,11 +75,14 @@ async def procressAccount(cookies, cookieName):
             
             t1 = time.time()
             print("%s: Woken up" % (cookieName))
-            canvas = await loadCanvas()
-            canvas = dataToImg(canvas, canvasShape)
-            print("%s: Canvas Loaded" % (cookieName))
-            (y, x), color = selectPix(canvas, img, mask, writePos)
-            print("%s: Selected pixel x = %d, y = %d, color = %s" % (cookieName, x, y, color))
+            with globalCanvasLocker:
+                if(len(globalDiffCache) == 0):
+                    print("%s: Nothing to do" % (cookieName))
+                    forceSleep = True
+                    continue
+                ((y, x), color), _ = selectPixFromCache(globalDiffCache)
+                nUnpainted = len(globalDiffCache)
+            print("%s: Selected pixel x = %d, y = %d, color = %s, Unpainted %d" % (cookieName, x, y, color, nUnpainted))
             dur = time.time() - t1
             latency = latency * 0.9 + dur * 0.1
             
@@ -85,10 +97,22 @@ async def procressAccount(cookies, cookieName):
                 placeIntoBlackList(cookieName)
                 return
         except Exception as e:
-            print("%s: Exception occurred => %s", (cookieName, str(e)))
+            print("%s: Exception occurred => %s" % (cookieName, str(e)))
 
 async def main():
     loop = asyncio.get_event_loop()
+    
+    print("Main: Load canvas data from remote")
+    canvas = await loadCanvas()
+    print("Main: Convert canvas data")
+    canvas = dataToImg(canvas, canvasShape)
+    print("Main: Update local canvas data and pixel cache")
+    with globalCanvasLocker:
+        globalCanvas[:] = canvas
+        globalDiffCache[:] = genDiffCache(globalCanvas, img, mask, writePos)
+    print("Main: Canvas updated")
+    del canvas
+    
     futureList = []
     for i, cookieName in enumerate(cookiePathList):
         futureList.append(asyncio.ensure_future(procressAccount(cookieList[i], cookieName)))
@@ -96,6 +120,17 @@ async def main():
     while(True):
         newCookiePathList = os.listdir("./accounts")
         try:
+            print("Main: Load canvas data from remote")
+            canvas = await loadCanvas()
+            print("Main: Convert canvas data")
+            canvas = dataToImg(canvas, canvasShape)
+            print("Main: Update local canvas data and pixel cache")
+            with globalCanvasLocker:
+                globalCanvas[:] = canvas
+                globalDiffCache[:] = genDiffCache(globalCanvas, img, mask, writePos)
+            print("Main: Canvas updated")
+            del canvas
+            
             with cookieLock:
                 if(os.path.isfile("black.json")):
                     blacklistedCookieList[:] = json.load(open("black.json", "r"))

@@ -7,6 +7,7 @@ Bilibili夏日绘板自动绘制工具
 * 修改其中的writePos变量控制绘制目标左上角的位置，格式为tuple(y, x)
 * 默认载入aria_cut.png作为目标图像，图像内颜色需全部为绘板调色板颜色
 * 默认载入aria_mask.png作为遮罩图像，黑色区域表示需要绘制，其他颜色区域表示无需绘制
+* 可以使用loadJsonImage(path)函数载入一个json中的图像数据，详情见common.py#L202
 
 **showblock.py: 显示工具**
 * y, x变量为显示左上角，显示宽高默认从aria_cut.png读取
